@@ -213,7 +213,7 @@ function visibleWraith(zombie)
             end
         end
     end
-end)
+end
 
 local function Load()
     task.spawn(function()
