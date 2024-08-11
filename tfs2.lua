@@ -20,6 +20,8 @@ local announce = false
 local fb = false
 local wraith = false
 
+local reload
+
 local tween, target, held
 
 local specials = {
@@ -357,6 +359,39 @@ task.spawn(function()
 
     MiscTab:NewToggle("Visible Wraiths", false, function(v)
         wraith = v
+    end)
+
+    MiscTab:NewLabel("Equip weapon you wish to make fullauto/semi.")
+    MiscTab:NewButton("FullAuto Gun", function()
+        local success, error = pcall(function()
+            for i,v in pairs(player.Character:GetChildren()) do
+                if v:IsA("Tool") then
+                    v.CurrentValues.FireType.Value = "FullAuto"
+                end
+            end
+        end)
+
+        if success then
+            return
+        else
+            Notif:Notify(error, 5, "error")
+        end
+    end)
+
+    MiscTab:NewButton("Semi Gun", function()
+        local success, error = pcall(function()
+            for i,v in pairs(player.Character:GetChildren()) do
+                if v:IsA("Tool") then
+                    v.CurrentValues.FireType.Value = "Single"
+                end
+            end
+        end)
+
+        if success then
+            return
+        else
+            Notif:Notify(error, 5, "error")
+        end
     end)
 
 	SettingsTab:NewKeybind("Toggle UI", nil, function(v)
