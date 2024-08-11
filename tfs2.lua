@@ -361,6 +361,7 @@ task.spawn(function()
         wraith = v
     end)
 
+    MiscTab:NewSeperator()
     MiscTab:NewLabel("Equip weapon you wish to make fullauto/semi.")
     MiscTab:NewButton("FullAuto Gun", function()
         local success, error = pcall(function()
