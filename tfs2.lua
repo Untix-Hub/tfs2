@@ -6,6 +6,9 @@ local cameraPath = workspace.CurrentCamera
 local player = game:GetService("Players").LocalPlayer
 local mouse = player:GetMouse()
 
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Untix-Hub/uisrc/main/src.lua"))()
+local Notif = library:InitNotifications()
+
 local priority = {}
 local espTable = {}
 local announceTable = {}
@@ -13,6 +16,7 @@ local blacklist = {}
 
 local aimbot = false
 local delay = 0.025
+local assassin = false
 
 local esp = false
 local announce = false
@@ -153,50 +157,88 @@ function visualizeESP(zombie)
 	end)
 end
 
-local function getNearestZombie()
-	local zombiePath = workspace.Zombies
-	local closestPriorityDistance = math.huge
-	local closestOtherDistance = math.huge
-	local mousePosition = mouse.Hit.Position
-	local priorityTarget, otherTarget
+local function getLowestHealthNearMouse()
+    local lowestHealthZombie = nil
+    local lowestHealth = math.huge
+    local closestDistanceToMouse = math.huge
+    local zombiePath = workspace.Zombies
+    local mousePosition = mouse.Hit.Position
 
-	for _, zombie in pairs(zombiePath:GetChildren()) do
-		if table.find(blacklist, zombie.Name) then return end
-		
-		if zombie:FindFirstChild("Zombie") and zombie.Zombie.Health > 0 then
-			local head = zombie:FindFirstChild("Head")
+    for _, zombie in pairs(zombiePath:GetChildren()) do
+        if zombie:FindFirstChild("Zombie") and zombie.Zombie.Health > 0 then
+            local head = zombie:FindFirstChild("Head")
 
-			if head then
-				local screenPosition, onScreen = cameraPath:WorldToViewportPoint(head.Position)
-				local distanceToMouse = (mousePosition - head.Position).Magnitude
+            if head and isVisible(zombie.Head.Position, zombie.Head.Parent) then
+                local _, onScreen = cameraPath:WorldToViewportPoint(head.Position)
+                local distanceToMouse = (mousePosition - head.Position).Magnitude
+                local zombieHealth = zombie.Zombie.Health
 
-				if isPriorityZombie(zombie.Name) then
-					if distanceToMouse < closestPriorityDistance then
-						if onScreen and isVisible(head.Position, head.Parent) and not zombie:FindFirstChildWhichIsA("ForceField") then
-							closestPriorityDistance = distanceToMouse
-							priorityTarget = zombie
-						end
-					end
-				else
-					if distanceToMouse < closestOtherDistance then
-						if onScreen and isVisible(head.Position, head.Parent) and not zombie:FindFirstChildWhichIsA("ForceField") then
-							closestOtherDistance = distanceToMouse
-							otherTarget = zombie
-						end
-					end
-				end
-			end
-		end
-	end
+                -- Prioritize the zombie with the lowest health near the mouse cursor
+                if zombieHealth < lowestHealth and distanceToMouse < closestDistanceToMouse and not zombie:FindFirstChildWhichIsA("ForceField") and onScreen then
+                    lowestHealth = zombieHealth
+                    closestDistanceToMouse = distanceToMouse
+                    lowestHealthZombie = zombie
+                end
+            end
+        end
+    end
 
-	if priorityTarget then
-		target = priorityTarget
-	else
-		target = otherTarget
-	end
+    return lowestHealthZombie
 end
 
-function visibleWraith(zombie)
+local function getNearestZombie()
+    local zombiePath = workspace.Zombies
+    local closestPriorityDistance = math.huge
+    local closestOtherDistance = math.huge
+    local mousePosition = mouse.Hit.Position
+    local priorityTarget, otherTarget
+
+    -- If Assassin is off cooldown, prioritize the lowest health zombie near the mouse
+    if player.PlayerValues.PerkValues.AssassinCD.Value == 0 and assassin then
+        target = getLowestHealthNearMouse()
+        return
+    end
+
+    -- Default targeting logic
+    for _, zombie in pairs(zombiePath:GetChildren()) do
+        if zombie:FindFirstChild("Zombie") and zombie.Zombie.Health > 0 then
+            local head = zombie:FindFirstChild("Head")
+            
+            if head then
+                -- Calculate the distance from the mouse position to the zombie's head
+                local screenPosition, onScreen = cameraPath:WorldToViewportPoint(head.Position)
+                local distanceToMouse = (mousePosition - head.Position).Magnitude
+
+                -- Check if the zombie is a priority target
+                if isPriorityZombie(zombie.Name) then
+                    if distanceToMouse < closestPriorityDistance then
+                        if onScreen and isVisible(head.Position, head.Parent) and not zombie:FindFirstChildWhichIsA("ForceField") then
+                            closestPriorityDistance = distanceToMouse
+                            priorityTarget = zombie
+                        end
+                    end
+                else
+                    -- Handle non-priority zombies
+                    if distanceToMouse < closestOtherDistance then
+                        if onScreen and isVisible(head.Position, head.Parent) and not zombie:FindFirstChildWhichIsA("ForceField") then
+                            closestOtherDistance = distanceToMouse
+                            otherTarget = zombie
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Prioritize target selection
+    if priorityTarget then
+        target = priorityTarget
+    else
+        target = otherTarget
+    end
+end
+
+local function visibleWraith(zombie)
     if not wraith then
         return
     end
@@ -229,6 +271,7 @@ local function Load()
             game.Lighting.Brightness = 5
             game.Lighting.Ambient = Color3.fromRGB(255,255,255)
             game.Lighting.FogStart = 0
+            game.Lighting.FogEnd = math.huge
         end)
     end)
 
@@ -273,10 +316,8 @@ local function Load()
 end
 
 task.spawn(function()
-	local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Untix-Hub/uisrc/main/src.lua"))()
 	library.title = "The Final Stand 2"
 
-	local Notif = library:InitNotifications()
 	Notif:Notify("Loading the hub...", 8, "information")
 	library:Introduction()
 
@@ -291,6 +332,10 @@ task.spawn(function()
 
 	AimTab:NewToggle("Aimbot", false, function(v)
 		aimbot = v
+	end)
+
+	AimTab:NewToggle("Assassin", false, function(v)
+		assassin = v
 	end)
 
 	AimTab:NewSlider("Delay", "ms", false, " / ", {min = 0, max = 100, default = 25}, function(v)
